@@ -1,0 +1,95 @@
+{% load paycheck_extras %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Print {{ template.name }}</title>
+    <style>
+        :root {
+            --check-width: {{ template.width_mm }}mm;
+            --check-height: {{ template.height_mm }}mm;
+        }
+        @page {
+            size: {{ template.width_mm }}mm {{ template.height_mm }}mm;
+            margin: 0;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: var(--check-width);
+            height: var(--check-height);
+            font-family: "Segoe UI", sans-serif;
+        }
+        .sheet {
+            width: var(--check-width);
+            height: var(--check-height);
+            position: relative;
+            overflow: hidden;
+            background: transparent;
+        }
+        .guide {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+            opacity: 0.25;
+            pointer-events: none;
+        }
+        .text-field {
+            position: absolute;
+            white-space: nowrap;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            color: #000;
+        }
+        @media screen {
+            body {
+                background: #f0f2f5;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                width: 100%;
+                min-height: 100vh;
+                padding: 16px;
+                box-sizing: border-box;
+            }
+            .sheet {
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+                background: white;
+            }
+            .actions {
+                position: fixed;
+                right: 16px;
+                top: 16px;
+            }
+            .actions button {
+                padding: 10px 16px;
+                border: 0;
+                border-radius: 8px;
+                background: #1f6feb;
+                color: white;
+                font-weight: 600;
+                cursor: pointer;
+            }
+        }
+        @media print {
+            .actions { display: none; }
+            .guide { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="actions"><button onclick="window.print()">Print values only</button></div>
+    <div class="sheet">
+        <img class="guide" src="{{ template.image.url }}" alt="Alignment guide (screen only)">
+        {% for field in template.fields %}
+            <div class="text-field" style="left: {{ field.x }}%; top: {{ field.y }}%; width: {{ field.w }}%; height: {{ field.h }}%; font-size: {{ field.font_size_mm }}mm;">
+                {{ values|get_item:field.key }}
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

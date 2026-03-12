@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="card narrow">
+    <h1>Upload Check Template</h1>
+    <p>Use the real paper dimensions in millimeters for precise printing.</p>
+    <form method="post" enctype="multipart/form-data" class="stack">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button" type="submit">Save and Design Fields</button>
+    </form>
+</section>
+{% endblock %}

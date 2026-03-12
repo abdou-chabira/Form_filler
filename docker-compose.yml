@@ -1,0 +1,18 @@
+services:
+  web:
+    build: .
+    container_name: paycheck_web
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SQLITE_PATH=/app/data/db.sqlite3
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_data:/app/media
+      - db_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  media_data:
+  db_data:

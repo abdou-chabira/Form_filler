@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="card">
+    <h1>Design Fields: {{ template.name }}</h1>
+    <p>Drag on the check image to create a text field area. Drag existing boxes to move, use the corner handle to resize, and edit key/label/font in the side panel.</p>
+    <form method="post" id="designer-form">
+        {% csrf_token %}
+        <input type="hidden" name="fields_json" id="fields-json">
+        <div class="designer-layout">
+            <div>
+                <div id="image-stage" class="image-stage">
+                    <img id="check-image" src="{{ template.image.url }}" alt="Check template">
+                    <div id="overlay" class="overlay"></div>
+                </div>
+            </div>
+            <aside class="card side-panel">
+                <h3>Fields</h3>
+                <p>Double-click a rectangle to delete it.</p>
+                <ul id="field-list" class="field-list"></ul>
+                <button class="button" type="submit">Save Fields</button>
+            </aside>
+        </div>
+    </form>
+</section>
+
+{{ existing_fields_json|json_script:"existing-fields" }}
+<script src="{% static 'paycheck/js/designer.js' %}"></script>
+{% endblock %}

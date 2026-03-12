@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="card">
+    <h1>Check Templates</h1>
+    <p>Upload a scanned paycheck, map fields, then fill and print with exact coordinates.</p>
+    <a class="button" href="{% url 'paycheck:template_create' %}">Create Template</a>
+</section>
+
+<section class="grid">
+    {% for item in templates %}
+        <article class="card">
+            <h3>{{ item.name }}</h3>
+            <p>Size: {{ item.width_mm }} mm x {{ item.height_mm }} mm</p>
+            <p>Fields: {{ item.fields|length }}</p>
+            <div class="inline-actions">
+                <a class="button" href="{% url 'paycheck:template_design' item.id %}">Design</a>
+                <a class="button secondary" href="{% url 'paycheck:template_fill' item.id %}">Fill</a>
+            </div>
+        </article>
+    {% empty %}
+        <article class="card"><p>No templates yet.</p></article>
+    {% endfor %}
+</section>
+{% endblock %}

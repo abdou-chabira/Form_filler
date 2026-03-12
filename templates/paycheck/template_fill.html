@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="card narrow">
+    <h1>Fill Check: {{ template.name }}</h1>
+    <p>Enter values for each mapped field, then generate a print-ready layout.</p>
+    <form method="post" class="stack">
+        {% csrf_token %}
+        {% for field in template.fields %}
+            <label>
+                {{ field.label }}
+                <input class="form-control" type="text" name="{{ field.key }}" placeholder="{{ field.label }}">
+            </label>
+        {% empty %}
+            <p>No fields found. Go back and design the template first.</p>
+        {% endfor %}
+        {% if template.fields %}
+            <button class="button" type="submit">Generate Print View</button>
+        {% endif %}
+    </form>
+</section>
+{% endblock %}
