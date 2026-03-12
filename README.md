@@ -30,6 +30,22 @@ python manage.py runserver
 
 5. Open `http://127.0.0.1:8000/`.
 
+## Django Admin Panel
+
+1. Create an admin user:
+
+```bash
+python manage.py createsuperuser
+```
+
+2. Start the app and open:
+
+```text
+http://127.0.0.1:8000/admin/
+```
+
+3. Log in and manage check templates from the admin dashboard.
+
 ## Run With Docker
 
 1. Copy `.env.example` to `.env` and adjust values if needed.
