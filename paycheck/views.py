@@ -109,6 +109,60 @@ def template_print(request, template_id):
     template = get_object_or_404(CheckTemplate, id=template_id)
     values = request.session.get(f"template_values_{template.id}", {})
 
+    def safe_float(value, default):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    if request.method == "POST":
+        raw_fields = request.POST.get("fields_json")
+        if raw_fields is None:
+            messages.error(request, "No position data submitted.")
+            return redirect("paycheck:template_print", template_id=template.id)
+
+        try:
+            parsed_fields = json.loads(raw_fields)
+        except json.JSONDecodeError:
+            messages.error(request, "Invalid position data. Please try again.")
+            return redirect("paycheck:template_print", template_id=template.id)
+
+        valid_fields = []
+        used_keys = set()
+        for item in parsed_fields:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key", "")).strip().replace(" ", "_")
+            label = str(item.get("label", key)).strip() or key
+            if not key:
+                continue
+            base_key = key
+            suffix = 2
+            while key in used_keys:
+                key = f"{base_key}_{suffix}"
+                suffix += 1
+            used_keys.add(key)
+            valid_fields.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "x": max(0, min(100, safe_float(item.get("x", 0), 0))),
+                    "y": max(0, min(100, safe_float(item.get("y", 0), 0))),
+                    "w": max(0.1, min(100, safe_float(item.get("w", 10), 10))),
+                    "h": max(0.1, min(100, safe_float(item.get("h", 5), 5))),
+                    "font_size_mm": max(1.5, min(12, safe_float(item.get("font_size_mm", 3.5), 3.5))),
+                }
+            )
+
+        if not valid_fields:
+            messages.error(request, "No field positions were saved.")
+            return redirect("paycheck:template_print", template_id=template.id)
+
+        template.fields = valid_fields
+        template.save(update_fields=["fields"])
+        messages.success(request, "Field positions updated.")
+        return redirect("paycheck:template_print", template_id=template.id)
+
     return render(
         request,
         "paycheck/template_print.html",

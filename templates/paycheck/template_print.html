@@ -45,6 +45,11 @@
             align-items: center;
             color: #000;
         }
+        .text-field.editable {
+            cursor: move;
+            outline: 1px dashed rgba(0, 114, 153, 0.7);
+            background: rgba(13, 126, 166, 0.08);
+        }
         @media screen {
             body {
                 background: linear-gradient(90deg, #6EC1E4 0%, #084C61 100%);
@@ -75,22 +80,148 @@
                 cursor: pointer;
                 box-shadow: 0 6px 14px rgba(7, 76, 97, 0.34);
             }
+            .actions {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .actions form {
+                margin: 0;
+            }
+            .actions .button-muted {
+                background: linear-gradient(180deg, #5f7f8a, #506b74);
+            }
+            .actions .button-success {
+                background: linear-gradient(180deg, #2f9d58, #227141);
+            }
         }
         @media print {
             .actions { display: none; }
             .guide { display: none; }
+            .text-field {
+                outline: none !important;
+                background: transparent !important;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="actions"><button onclick="window.print()">Print values only</button></div>
+    <div class="actions">
+        <button type="button" id="toggle-edit" class="button-muted">Edit Positions</button>
+        <form method="post" id="positions-form">
+            {% csrf_token %}
+            <input type="hidden" name="fields_json" id="fields-json">
+            <button type="submit" id="save-positions" class="button-success" style="display:none;">Save Positions</button>
+        </form>
+        <button type="button" onclick="window.print()">Print values only</button>
+    </div>
     <div class="sheet">
         <img class="guide" src="{{ template.image.url }}" alt="Alignment guide (screen only)">
         {% for field in template.fields %}
-            <div class="text-field" style="left: {{ field.x }}%; top: {{ field.y }}%; width: {{ field.w }}%; height: {{ field.h }}%; font-size: {{ field.font_size_mm }}mm;">
+            <div class="text-field" data-index="{{ forloop.counter0 }}" style="left: {{ field.x }}%; top: {{ field.y }}%; width: {{ field.w }}%; height: {{ field.h }}%; font-size: {{ field.font_size_mm }}mm;">
                 {{ values|get_item:field.key }}
             </div>
         {% endfor %}
     </div>
+    {{ template.fields|json_script:"template-fields" }}
+    <script>
+        (() => {
+            const sheet = document.querySelector(".sheet");
+            const toggleEdit = document.getElementById("toggle-edit");
+            const saveButton = document.getElementById("save-positions");
+            const fieldsInput = document.getElementById("fields-json");
+            const fieldsRaw = document.getElementById("template-fields");
+
+            if (!sheet || !toggleEdit || !saveButton || !fieldsInput || !fieldsRaw) {
+                return;
+            }
+
+            let templateFields = [];
+            try {
+                const parsed = JSON.parse(fieldsRaw.textContent || "[]");
+                templateFields = Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                templateFields = [];
+            }
+
+            let editMode = false;
+            let dragState = null;
+
+            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+            const getFieldNodes = () => Array.from(sheet.querySelectorAll(".text-field"));
+
+            const setEditMode = (enabled) => {
+                editMode = enabled;
+                toggleEdit.textContent = enabled ? "Stop Editing" : "Edit Positions";
+                saveButton.style.display = enabled ? "inline-block" : "none";
+                getFieldNodes().forEach((node) => {
+                    node.classList.toggle("editable", enabled);
+                });
+            };
+
+            const syncFieldsJson = () => {
+                fieldsInput.value = JSON.stringify(templateFields);
+            };
+
+            const startDrag = (event, node) => {
+                if (!editMode) {
+                    return;
+                }
+                const index = Number.parseInt(node.dataset.index || "-1", 10);
+                if (!Number.isInteger(index) || index < 0 || !templateFields[index]) {
+                    return;
+                }
+
+                event.preventDefault();
+                const field = templateFields[index];
+                dragState = {
+                    index,
+                    startClientX: event.clientX,
+                    startClientY: event.clientY,
+                    startX: Number(field.x || 0),
+                    startY: Number(field.y || 0),
+                    width: Number(field.w || 0),
+                    height: Number(field.h || 0),
+                    node,
+                };
+            };
+
+            const updateDrag = (event) => {
+                if (!dragState) {
+                    return;
+                }
+                const rect = sheet.getBoundingClientRect();
+                const deltaX = ((event.clientX - dragState.startClientX) / rect.width) * 100;
+                const deltaY = ((event.clientY - dragState.startClientY) / rect.height) * 100;
+                const field = templateFields[dragState.index];
+                if (!field) {
+                    dragState = null;
+                    return;
+                }
+
+                field.x = clamp(dragState.startX + deltaX, 0, 100 - dragState.width);
+                field.y = clamp(dragState.startY + deltaY, 0, 100 - dragState.height);
+                dragState.node.style.left = `${field.x}%`;
+                dragState.node.style.top = `${field.y}%`;
+                syncFieldsJson();
+            };
+
+            getFieldNodes().forEach((node) => {
+                node.addEventListener("mousedown", (event) => startDrag(event, node));
+            });
+
+            window.addEventListener("mousemove", updateDrag);
+            window.addEventListener("mouseup", () => {
+                dragState = null;
+            });
+
+            toggleEdit.addEventListener("click", () => {
+                setEditMode(!editMode);
+            });
+
+            syncFieldsJson();
+        })();
+    </script>
 </body>
 </html>
