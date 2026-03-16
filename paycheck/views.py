@@ -104,7 +104,7 @@ def money_to_french(amount):
     euros = total_cents // 100
     cents = total_cents % 100
 
-    words = number_to_french(euros) + " euro"
+    words = number_to_french(euros) + " dinnars"
     if euros > 1:
         words += "s"
 
