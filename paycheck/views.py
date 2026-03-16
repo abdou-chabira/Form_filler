@@ -1,10 +1,119 @@
 import json
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CheckTemplateUploadForm
 from .models import CheckTemplate
+
+
+def number_to_french(n):
+    units = [
+        "zero",
+        "un",
+        "deux",
+        "trois",
+        "quatre",
+        "cinq",
+        "six",
+        "sept",
+        "huit",
+        "neuf",
+        "dix",
+        "onze",
+        "douze",
+        "treize",
+        "quatorze",
+        "quinze",
+        "seize",
+    ]
+    tens = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante"]
+
+    if n < 0:
+        return "moins " + number_to_french(-n)
+
+    if n < 17:
+        return units[n]
+
+    if n < 20:
+        return "dix-" + units[n - 10]
+
+    if n < 70:
+        t = n // 10
+        u = n % 10
+        word = tens[t]
+        if u == 1:
+            return word + "-et-un"
+        if u > 0:
+            return word + "-" + units[u]
+        return word
+
+    if n < 80:
+        if n == 71:
+            return "soixante-et-onze"
+        return "soixante-" + number_to_french(n - 60)
+
+    if n < 100:
+        if n == 80:
+            return "quatre-vingts"
+        return "quatre-vingt-" + number_to_french(n - 80)
+
+    if n < 1000:
+        h = n // 100
+        r = n % 100
+        if h == 1:
+            prefix = "cent"
+        else:
+            prefix = units[h] + " cent"
+
+        if r == 0:
+            return prefix
+        return prefix + " " + number_to_french(r)
+
+    if n < 1_000_000:
+        th = n // 1000
+        r = n % 1000
+        if th == 1:
+            prefix = "mille"
+        else:
+            prefix = number_to_french(th) + " mille"
+
+        if r == 0:
+            return prefix
+        return prefix + " " + number_to_french(r)
+
+    if n < 1_000_000_000:
+        m = n // 1_000_000
+        r = n % 1_000_000
+        if m == 1:
+            prefix = "un million"
+        else:
+            prefix = number_to_french(m) + " millions"
+
+        if r == 0:
+            return prefix
+        return prefix + " " + number_to_french(r)
+
+    return "nombre trop grand"
+
+
+def money_to_french(amount):
+    quantized = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    total_cents = int(quantized * 100)
+    euros = total_cents // 100
+    cents = total_cents % 100
+
+    words = number_to_french(euros) + " euro"
+    if euros > 1:
+        words += "s"
+
+    if cents > 0:
+        words += " et " + number_to_french(cents) + " centime"
+        if cents > 1:
+            words += "s"
+
+    return words
 
 
 def template_list(request):
@@ -90,19 +199,49 @@ def template_design(request, template_id):
 
 def template_fill(request, template_id):
     template = get_object_or_404(CheckTemplate, id=template_id)
+    converter_input = ""
+    converter_result = ""
+    field_values = {}
 
     if request.method == "POST":
-        values = {}
+        action = request.POST.get("action", "generate_print")
+
         for field in template.fields:
             key = field.get("key")
             if not key:
                 continue
-            values[key] = request.POST.get(key, "")
+            field_values[key] = request.POST.get(key, "")
 
-        request.session[f"template_values_{template.id}"] = values
-        return redirect("paycheck:template_print", template_id=template.id)
+        if action == "convert_amount":
+            converter_input = request.POST.get("amount_to_convert", "").strip()
+            if not converter_input:
+                messages.error(request, "Enter an amount to convert.")
+            else:
+                normalized = converter_input.replace(" ", "").replace(",", ".")
+                try:
+                    amount = Decimal(normalized)
+                    if amount < 0:
+                        messages.error(request, "Amount must be positive.")
+                    elif amount >= Decimal("1000000000"):
+                        messages.error(request, "Amount is too large (must be below 1,000,000,000).")
+                    else:
+                        converter_result = money_to_french(amount)
+                except InvalidOperation:
+                    messages.error(request, "Invalid number format. Example: 1234.56")
+        else:
+            request.session[f"template_values_{template.id}"] = field_values
+            return redirect("paycheck:template_print", template_id=template.id)
 
-    return render(request, "paycheck/template_fill.html", {"template": template})
+    return render(
+        request,
+        "paycheck/template_fill.html",
+        {
+            "template": template,
+            "field_values": field_values,
+            "converter_input": converter_input,
+            "converter_result": converter_result,
+        },
+    )
 
 
 def template_print(request, template_id):

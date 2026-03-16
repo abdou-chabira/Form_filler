@@ -1,15 +1,37 @@
 {% extends 'base.html' %}
+{% load paycheck_extras %}
 
 {% block content %}
 <section class="card narrow">
     <h1>Fill Check: {{ template.name }}</h1>
     <p>Enter values for each mapped field, then generate a print-ready layout.</p>
+
+    <div class="card" style="margin-bottom: 16px;">
+        <h3 style="margin-top: 0;">Amount to French Text</h3>
+        <p style="margin-top: 0;">Enter a number (example: 1250.75), then copy the generated text.</p>
+        <form method="post" class="stack" style="margin-bottom: 8px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="convert_amount">
+            <label>
+                Amount
+                <input class="form-control" type="text" name="amount_to_convert" value="{{ converter_input }}" placeholder="1250.75">
+            </label>
+            <button class="button" type="submit">Convert to French</button>
+        </form>
+        <label>
+            Result
+            <textarea id="french-result" class="form-control" rows="2" readonly>{{ converter_result }}</textarea>
+        </label>
+        <button class="button" type="button" id="copy-french-btn" style="margin-top: 8px;">Copy Result</button>
+    </div>
+
     <form method="post" class="stack">
         {% csrf_token %}
+        <input type="hidden" name="action" value="generate_print">
         {% for field in template.fields %}
             <label>
                 {{ field.label }}
-                <input class="form-control" type="text" name="{{ field.key }}" placeholder="{{ field.label }}">
+                <input class="form-control" type="text" name="{{ field.key }}" value="{{ field_values|get_item:field.key }}" placeholder="{{ field.label }}">
             </label>
         {% empty %}
             <p>No fields found. Go back and design the template first.</p>
@@ -19,4 +41,31 @@
         {% endif %}
     </form>
 </section>
+
+<script>
+    (() => {
+        const copyButton = document.getElementById("copy-french-btn");
+        const resultBox = document.getElementById("french-result");
+        if (!copyButton || !resultBox) {
+            return;
+        }
+
+        copyButton.addEventListener("click", async () => {
+            const text = (resultBox.value || "").trim();
+            if (!text) {
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                copyButton.textContent = "Copied";
+                setTimeout(() => {
+                    copyButton.textContent = "Copy Result";
+                }, 1200);
+            } catch (error) {
+                resultBox.focus();
+                resultBox.select();
+            }
+        });
+    })();
+</script>
 {% endblock %}
